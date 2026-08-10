@@ -16,7 +16,6 @@ import uvicorn
 from src.api.models import (
     AnalysisRequest, AnalysisResponse, HealthCheck
 )
-from src.api.inference import InferenceOrchestrator
 
 logging.basicConfig(
     level=logging.INFO,
