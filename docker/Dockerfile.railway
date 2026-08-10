@@ -27,10 +27,9 @@ RUN pip install --no-cache-dir -q -r requirements.txt
 
 # Copy source code
 COPY src/ src/
-COPY configs/ configs/ 2>/dev/null || true
 
 # Create directories
-RUN mkdir -p uploads results logs
+RUN mkdir -p uploads results logs configs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
