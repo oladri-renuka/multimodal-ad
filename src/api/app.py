@@ -17,7 +17,6 @@ import asyncio
 from src.api.models import (
     AnalysisRequest, AnalysisResponse, HealthCheck
 )
-from src.core.frame_extractor import FrameExtractor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -117,6 +116,7 @@ def run_inference(job_id: str, file_path: Path, file_name: str, detector_thresho
 
         if is_video:
             logger.info(f"📹 Video detected, extracting frames...")
+            from src.core.frame_extractor import FrameExtractor
             temp_dir = Path(f"temp_frames_{job_id}")
             frames, metadata = FrameExtractor.extract_frames(str(file_path), str(temp_dir), target_fps=2)
             logger.info(f"✓ Extracted {len(frames)} frames")
