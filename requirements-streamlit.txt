@@ -1,5 +1,5 @@
 # Lightweight requirements for Streamlit Cloud deployment
-# Remove heavy/incompatible dependencies (Whisper, VLM, testing, development)
+# Remove heavy dependencies (Whisper, older PyTorch)
 
 # Core ML/Vision
 torch>=2.0.0
