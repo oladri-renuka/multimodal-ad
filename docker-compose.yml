@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./configs:/app/configs
+      - ./models:/app/models
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - cache:/cache
+    environment:
+      - DEVICE=cuda
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    container_name: multimodal-api
+    restart: unless-stopped
+
+volumes:
+  cache:
+    driver: local
