@@ -754,7 +754,17 @@ def get_demo_html() -> str:
                     }
 
                     const data = await response.json();
-                    displayResults(data);
+                    const jobId = data.job_id;
+
+                    // Poll for results until completed
+                    let results = data;
+                    while (results.status === 'processing') {
+                        await new Promise(r => setTimeout(r, 1000));
+                        const resRes = await fetch(`/results/${jobId}`);
+                        results = await resRes.json();
+                    }
+
+                    displayResults(results);
 
                 } catch (err) {
                     showError('Analysis failed: ' + err.message);

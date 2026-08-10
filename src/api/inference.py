@@ -274,10 +274,10 @@ class InferenceOrchestrator:
         # Rule-based verdict logic
         if "weapon" in class_name:
             violation_type = "weapon"
-            reasoning = f"Weapon detected with {confidence:.1%} confidence."
+            reasoning = f"Weapon detected with {confidence:.1%} confidence. Requires context review to determine if violation."
             if ocr_text:
                 reasoning += f" Contains text: '{ocr_text[:50]}'."
-            action = "flag" if confidence > 0.6 else "review"
+            action = "review"  # Always review weapons to check context (military, training, etc.)
 
         elif "nsfw" in class_name or "person" in class_name:
             violation_type = "nsfw"
