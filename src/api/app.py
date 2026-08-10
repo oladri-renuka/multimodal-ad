@@ -101,7 +101,7 @@ async def health_check():
         )
 
 
-def run_inference(job_id: str, file_path: Path, file_name: str, detector_threshold: float, ocr_enabled: bool, reasoning_enabled: bool):
+async def run_inference(job_id: str, file_path: Path, file_name: str, detector_threshold: float, ocr_enabled: bool, reasoning_enabled: bool):
     """Background task to run inference"""
     try:
         orch = get_orchestrator()
@@ -128,7 +128,7 @@ def run_inference(job_id: str, file_path: Path, file_name: str, detector_thresho
             frame_analyses = []
 
             for frame_idx, frame_path in enumerate(sorted(frames)):
-                frame_result = orch.analyze_image(
+                frame_result = await orch.analyze_image(
                     frame_path,
                     detector_threshold=detector_threshold,
                     ocr_enabled=ocr_enabled,
@@ -161,7 +161,7 @@ def run_inference(job_id: str, file_path: Path, file_name: str, detector_thresho
             }
         else:
             # Run inference on single image (blocking)
-            result = orch.analyze_image(
+            result = await orch.analyze_image(
                 file_path,
                 detector_threshold=detector_threshold,
                 ocr_enabled=ocr_enabled,
