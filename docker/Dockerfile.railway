@@ -3,11 +3,13 @@ FROM python:3.13
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV LIBGL_ALWAYS_INDIRECT=1
 
 WORKDIR /app
 
-# Install additional system dependencies for OpenCV
-RUN apt-get update && apt-get install -y \
+# Install system dependencies for OpenCV
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
     libsm6 \
     libxext6 \
     libxrender-dev \
