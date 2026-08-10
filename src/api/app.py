@@ -17,6 +17,7 @@ import asyncio
 from src.api.models import (
     AnalysisRequest, AnalysisResponse, HealthCheck
 )
+from src.core.frame_extractor import FrameExtractor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -110,13 +111,29 @@ def run_inference(job_id: str, file_path: Path, file_name: str, detector_thresho
         logger.info(f"JOB {job_id}: Analyzing {file_name}")
         logger.info(f"{'='*70}")
 
-        # Run inference (blocking)
-        result = orch.analyze_image(
-            file_path,
-            detector_threshold=detector_threshold,
-            ocr_enabled=ocr_enabled,
-            reasoning_enabled=reasoning_enabled
-        )
+        # Check if video or image
+        video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.webm'}
+        is_video = file_path.suffix.lower() in video_exts
+
+        if is_video:
+            logger.info(f"📹 Video detected, extracting frames...")
+            temp_dir = Path(f"temp_frames_{job_id}")
+            frames, metadata = FrameExtractor.extract_frames(str(file_path), str(temp_dir), target_fps=2)
+            logger.info(f"✓ Extracted {len(frames)} frames")
+            result = orch.analyze_image(
+                temp_dir,
+                detector_threshold=detector_threshold,
+                ocr_enabled=ocr_enabled,
+                reasoning_enabled=reasoning_enabled
+            )
+        else:
+            # Run inference on single image (blocking)
+            result = orch.analyze_image(
+                file_path,
+                detector_threshold=detector_threshold,
+                ocr_enabled=ocr_enabled,
+                reasoning_enabled=reasoning_enabled
+            )
 
         # Create response
         response = AnalysisResponse(
@@ -572,7 +589,7 @@ def get_demo_html() -> str:
                     <div class="upload-text">Click or drag to upload</div>
                     <div class="upload-hint">Supports JPG, PNG (under 10MB)</div>
                 </div>
-                <input type="file" id="fileInput" accept="image/*">
+                <input type="file" id="fileInput" accept="image/*,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska">
             </div>
 
             <div class="settings">
