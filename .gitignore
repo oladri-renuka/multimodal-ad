@@ -1,8 +1,7 @@
 # Large files (download/train separately)
-models/best.pt
 models/easyocr/
 models/*.pt
-*.pt
+!models/best.pt
 
 # Training data
 data/yolo_dataset/
