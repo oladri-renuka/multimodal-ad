@@ -1,0 +1,43 @@
+# Railway-optimized Dockerfile with system dependencies
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Install system dependencies for OpenCV and image processing
+RUN apt-get update && apt-get install -y \
+    libxcb1 \
+    libxkbcommon0 \
+    libxrender1 \
+    libxext6 \
+    libsm6 \
+    libxext-dev \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -q -r requirements.txt
+
+# Copy source code
+COPY src/ src/
+COPY configs/ configs/ 2>/dev/null || true
+
+# Create directories
+RUN mkdir -p uploads results logs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Start server
+CMD ["python", "-m", "src.api.app"]
