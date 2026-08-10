@@ -147,7 +147,7 @@ async def run_inference(job_id: str, file_path: Path, file_name: str, detector_t
             result = {
                 "file": str(file_path),
                 "frames": frame_analyses,
-                "violations_detected": len([v for v in all_verdicts if v.recommended_action == "flag"]),
+                "violations_detected": len([v for v in all_verdicts if v.recommended_action in ["flag", "review"]]),
                 "summary": {
                     "detections": len(all_detections),
                     "ocr_regions": len(all_ocr),

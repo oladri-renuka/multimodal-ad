@@ -190,7 +190,7 @@ class InferenceOrchestrator:
         result["frames"].append(frame_analysis)
 
         # Update summary
-        result["violations_detected"] = len(verdicts) if verdicts else len(detections)
+        result["violations_detected"] = len([v for v in verdicts if v.recommended_action in ["flag", "review"]]) if verdicts else len(detections)
         result["summary"]["detections"] = len(detections)
         result["summary"]["ocr_regions"] = len(ocr_results)
         result["summary"]["verdicts"] = len(verdicts)
