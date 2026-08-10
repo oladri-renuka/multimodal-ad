@@ -737,7 +737,8 @@ def run():
         host="0.0.0.0",
         port=8000,
         reload=False,
-        log_level="info"
+        log_level="info",
+        timeout_keep_alive=120
     )
 
 
