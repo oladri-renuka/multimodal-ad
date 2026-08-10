@@ -783,8 +783,9 @@ def get_demo_html() -> str:
 
                 if (violations === 0) {
                     html += '<div class="result-item"><div class="result-title">✅ No violations detected</div></div>';
-                } else {
+                } else if (data.frames && data.frames.length > 0) {
                     data.frames.forEach(frame => {
+                        if (frame.reasoning && frame.reasoning.length > 0) {
                         frame.reasoning.forEach(verdict => {
                             const badgeClass = verdict.violation_type.includes('weapon') ? 'badge-weapon' :
                                               verdict.violation_type.includes('nsfw') ? 'badge-nsfw' :
@@ -802,7 +803,10 @@ def get_demo_html() -> str:
                                 <div class="result-detail"><strong>Evidence:</strong> ${verdict.evidence.join(', ')}</div>
                             </div>`;
                         });
+                        }
                     });
+                } else {
+                    html += '<div class="result-item"><div class="result-title">⚠️ No detailed results available</div></div>';
                 }
 
                 resultsList.innerHTML = html;
