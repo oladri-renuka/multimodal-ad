@@ -120,12 +120,45 @@ def run_inference(job_id: str, file_path: Path, file_name: str, detector_thresho
             temp_dir = Path(f"temp_frames_{job_id}")
             frames, metadata = FrameExtractor.extract_frames(str(file_path), str(temp_dir), target_fps=2)
             logger.info(f"✓ Extracted {len(frames)} frames")
-            result = orch.analyze_image(
-                temp_dir,
-                detector_threshold=detector_threshold,
-                ocr_enabled=ocr_enabled,
-                reasoning_enabled=reasoning_enabled
-            )
+
+            # Analyze each frame and aggregate results
+            all_detections = []
+            all_ocr = []
+            all_verdicts = []
+            frame_analyses = []
+
+            for frame_idx, frame_path in enumerate(sorted(frames)):
+                frame_result = orch.analyze_image(
+                    frame_path,
+                    detector_threshold=detector_threshold,
+                    ocr_enabled=ocr_enabled,
+                    reasoning_enabled=reasoning_enabled
+                )
+                if frame_result["frames"]:
+                    frame_analysis = frame_result["frames"][0]
+                    frame_analysis.frame_idx = frame_idx
+                    frame_analysis.timestamp = frame_idx / 2.0  # ~2 FPS
+                    frame_analyses.append(frame_analysis)
+                    all_detections.extend(frame_analysis.detections)
+                    all_ocr.extend(frame_analysis.ocr)
+                    all_verdicts.extend(frame_analysis.reasoning)
+
+            # Aggregate results
+            result = {
+                "file": str(file_path),
+                "frames": frame_analyses,
+                "violations_detected": len([v for v in all_verdicts if v.recommended_action == "flag"]),
+                "summary": {
+                    "detections": len(all_detections),
+                    "ocr_regions": len(all_ocr),
+                    "verdicts": len(all_verdicts),
+                    "flagged": sum(1 for v in all_verdicts if v.recommended_action == "flag"),
+                    "flagged_percent": (
+                        sum(1 for v in all_verdicts if v.recommended_action == "flag") / len(all_verdicts) * 100
+                        if all_verdicts else 0
+                    )
+                }
+            }
         else:
             # Run inference on single image (blocking)
             result = orch.analyze_image(
@@ -150,6 +183,14 @@ def run_inference(job_id: str, file_path: Path, file_name: str, detector_thresho
 
         # Store result
         analysis_jobs[job_id] = response
+
+        # Clean up temp directory if video
+        if is_video:
+            import shutil
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except:
+                pass
 
         logger.info(f"✅ Job {job_id} completed")
         logger.info(f"   Violations detected: {response.violations_detected}")
