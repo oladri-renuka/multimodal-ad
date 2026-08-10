@@ -587,7 +587,7 @@ def get_demo_html() -> str:
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📸</div>
                     <div class="upload-text">Click or drag to upload</div>
-                    <div class="upload-hint">Supports JPG, PNG (under 10MB)</div>
+                    <div class="upload-hint">Supports JPG, PNG, MP4, MOV (under 10MB)</div>
                 </div>
                 <input type="file" id="fileInput" accept="image/*,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska">
             </div>
