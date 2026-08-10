@@ -8,10 +8,11 @@ from uuid import uuid4
 from datetime import datetime
 from typing import Dict
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import asyncio
 
 from src.api.models import (
     AnalysisRequest, AnalysisResponse, HealthCheck
@@ -100,38 +101,17 @@ async def health_check():
         )
 
 
-@app.post("/analyze", response_model=AnalysisResponse)
-async def analyze_image(
-    file: UploadFile = File(...),
-    detector_threshold: float = 0.45,
-    ocr_enabled: bool = True,
-    reasoning_enabled: bool = True
-):
-    """Analyze an uploaded image for violations"""
-
+def run_inference(job_id: str, file_path: Path, file_name: str, detector_threshold: float, ocr_enabled: bool, reasoning_enabled: bool):
+    """Background task to run inference"""
     try:
         orch = get_orchestrator()
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to load models: {str(e)}")
-
-    job_id = str(uuid4())[:8]
-
-    # Save uploaded file
-    upload_dir = Path("uploads")
-    upload_dir.mkdir(exist_ok=True)
-    file_path = upload_dir / file.filename
-
-    try:
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
 
         logger.info(f"\n{'='*70}")
-        logger.info(f"JOB {job_id}: Analyzing {file.filename}")
+        logger.info(f"JOB {job_id}: Analyzing {file_name}")
         logger.info(f"{'='*70}")
 
-        # Run inference
-        result = await orch.analyze_image(
+        # Run inference (blocking)
+        result = orch.analyze_image(
             file_path,
             detector_threshold=detector_threshold,
             ocr_enabled=ocr_enabled,
@@ -142,7 +122,7 @@ async def analyze_image(
         response = AnalysisResponse(
             job_id=job_id,
             status="completed",
-            file_name=file.filename,
+            file_name=file_name,
             frames_analyzed=len(result.get("frames", [])),
             violations_detected=result.get("violations_detected", 0),
             frames=result.get("frames", []),
@@ -157,21 +137,71 @@ async def analyze_image(
         logger.info(f"✅ Job {job_id} completed")
         logger.info(f"   Violations detected: {response.violations_detected}")
 
-        return response
-
     except Exception as e:
         logger.error(f"❌ Job {job_id} failed: {e}")
 
         response = AnalysisResponse(
             job_id=job_id,
             status="failed",
-            file_name=file.filename,
+            file_name=file_name,
             error=str(e),
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
         analysis_jobs[job_id] = response
-        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/analyze", response_model=AnalysisResponse)
+async def analyze_image(
+    file: UploadFile = File(...),
+    detector_threshold: float = 0.45,
+    ocr_enabled: bool = True,
+    reasoning_enabled: bool = True,
+    background_tasks: BackgroundTasks = None
+):
+    """Submit an image for analysis (returns immediately)"""
+
+    job_id = str(uuid4())[:8]
+
+    # Save uploaded file
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(exist_ok=True)
+    file_path = upload_dir / file.filename
+
+    try:
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
+        # Create pending response
+        response = AnalysisResponse(
+            job_id=job_id,
+            status="processing",
+            file_name=file.filename,
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+
+        # Store pending job
+        analysis_jobs[job_id] = response
+
+        # Start inference in background
+        background_tasks.add_task(
+            run_inference,
+            job_id,
+            file_path,
+            file.filename,
+            detector_threshold,
+            ocr_enabled,
+            reasoning_enabled
+        )
+
+        logger.info(f"📝 Job {job_id} queued for processing")
+        return response
+
+    except Exception as e:
+        logger.error(f"❌ Job {job_id} submission failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/results/{job_id}", response_model=AnalysisResponse)
