@@ -40,27 +40,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global inference orchestrator
+# Global inference orchestrator (lazy-loaded)
 orchestrator = None
 analysis_jobs: Dict[str, AnalysisResponse] = {}
 
 
+def get_orchestrator():
+    """Lazy-load orchestrator on first use"""
+    global orchestrator
+    if orchestrator is None:
+        logger.info("Loading inference orchestrator...")
+        try:
+            from src.api.inference import InferenceOrchestrator
+            orchestrator = InferenceOrchestrator()
+            logger.info("✅ Orchestrator loaded")
+        except Exception as e:
+            logger.error(f"❌ Failed to load orchestrator: {e}")
+            raise
+    return orchestrator
+
+
 @app.on_event("startup")
 async def startup_event():
-    """Initialize models on startup"""
-    global orchestrator
+    """Startup event - just log, don't load models yet"""
     logger.info("=" * 70)
     logger.info("PHASE 6: FASTAPI BACKEND STARTUP")
     logger.info("=" * 70)
-
-    try:
-        orchestrator = InferenceOrchestrator()
-        logger.info("✅ Inference orchestrator initialized")
-        logger.info(f"✅ GPU available: {orchestrator.gpu_available}")
-        logger.info(f"✅ Models loaded: {orchestrator.models_status}")
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize orchestrator: {e}")
-        orchestrator = None
+    logger.info("✅ Server starting (models loaded on first request)")
 
 
 @app.on_event("shutdown")
@@ -78,20 +84,21 @@ async def demo():
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
     """Health check endpoint"""
-    if orchestrator is None:
+    try:
+        orch = get_orchestrator()
         return HealthCheck(
-            status="error",
-            models_loaded={},
+            status="healthy",
+            models_loaded=orch.models_status,
+            gpu_available=orch.gpu_available,
+            memory_usage_mb=orch.get_memory_usage()
+        )
+    except:
+        return HealthCheck(
+            status="loading",
+            models_loaded={"status": "initializing"},
             gpu_available=False,
             memory_usage_mb=0.0
         )
-
-    return HealthCheck(
-        status="healthy",
-        models_loaded=orchestrator.models_status,
-        gpu_available=orchestrator.gpu_available,
-        memory_usage_mb=orchestrator.get_memory_usage()
-    )
 
 
 @app.post("/analyze", response_model=AnalysisResponse)
@@ -103,8 +110,10 @@ async def analyze_image(
 ):
     """Analyze an uploaded image for violations"""
 
-    if orchestrator is None:
-        raise HTTPException(status_code=503, detail="Models not loaded")
+    try:
+        orch = get_orchestrator()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to load models: {str(e)}")
 
     job_id = str(uuid4())[:8]
 
@@ -123,7 +132,7 @@ async def analyze_image(
         logger.info(f"{'='*70}")
 
         # Run inference
-        result = await orchestrator.analyze_image(
+        result = await orch.analyze_image(
             file_path,
             detector_threshold=detector_threshold,
             ocr_enabled=ocr_enabled,
