@@ -1,23 +1,16 @@
 # Railway-optimized Dockerfile with system dependencies
-FROM python:3.13-slim
+FROM python:3.13
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
-# Install system dependencies for OpenCV and image processing
+# Install additional system dependencies for OpenCV
 RUN apt-get update && apt-get install -y \
-    libglvnd0 \
-    libxcb1 \
-    libxkbcommon0 \
-    libxrender1 \
-    libxext6 \
     libsm6 \
-    libxext-dev \
+    libxext6 \
     libxrender-dev \
-    libgomp1 \
-    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
