@@ -18,18 +18,18 @@ import sys
 import subprocess
 from pathlib import Path
 
-print("🔧 Kaggle Environment Setup")
+print(" Kaggle Environment Setup")
 print("=" * 70)
 
 # Install dependencies
-print("\n📦 Installing dependencies...")
+print("\n Installing dependencies...")
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
                "ultralytics==8.4.117", "pyyaml"], check=True)
-print("✓ Installed ultralytics, pyyaml")
+print(" Installed ultralytics, pyyaml")
 
 # Check GPU
 import torch
-print(f"\n🎮 GPU Info:")
+print(f"\n GPU Info:")
 print(f"  CUDA available: {torch.cuda.is_available()}")
 print(f"  GPU count: {torch.cuda.device_count()}")
 if torch.cuda.is_available():
@@ -40,12 +40,12 @@ if torch.cuda.is_available():
 # CELL 2: Verify Dataset
 # =====================================================================
 
-print("\n📊 Dataset Verification")
+print("\n Dataset Verification")
 print("=" * 70)
 
 dataset_root = Path("/kaggle/input/multimodal-violation-detector-yolo")
 if not dataset_root.exists():
-    print(f"❌ Dataset not found at {dataset_root}")
+    print(f" Dataset not found at {dataset_root}")
     print("Make sure you added the dataset to this notebook!")
     sys.exit(1)
 
@@ -54,7 +54,7 @@ train_images = list((dataset_root / "images/train").glob("*.*"))
 val_images = list((dataset_root / "images/val").glob("*.*"))
 test_images = list((dataset_root / "images/test").glob("*.*"))
 
-print(f"\n✓ Dataset found!")
+print(f"\n Dataset found!")
 print(f"  Train: {len(train_images)} images")
 print(f"  Val: {len(val_images)} images")
 print(f"  Test: {len(test_images)} images")
@@ -63,18 +63,18 @@ print(f"  Total: {len(train_images) + len(val_images) + len(test_images)} images
 # Verify data.yaml
 yaml_path = dataset_root / "data.yaml"
 if yaml_path.exists():
-    print(f"✓ data.yaml found")
+    print(f" data.yaml found")
     with open(yaml_path) as f:
         print(f"  Contents:\n{f.read()}")
 else:
-    print(f"❌ data.yaml not found at {yaml_path}")
+    print(f" data.yaml not found at {yaml_path}")
     sys.exit(1)
 
 # =====================================================================
 # CELL 3: Fine-Tune YOLOv8n
 # =====================================================================
 
-print("\n🚀 Phase 2: Fine-Tune YOLOv8n on Real Violation Dataset")
+print("\n Phase 2: Fine-Tune YOLOv8n on Real Violation Dataset")
 print("=" * 70)
 
 from ultralytics import YOLO
@@ -83,10 +83,10 @@ from ultralytics import YOLO
 output_dir = Path("/kaggle/working/models")
 output_dir.mkdir(parents=True, exist_ok=True)
 
-print(f"\n📍 Output directory: {output_dir}")
+print(f"\n Output directory: {output_dir}")
 
 # Load pretrained model
-print("\n1️⃣ Loading YOLOv8n pretrained model...")
+print("\n1⃣ Loading YOLOv8n pretrained model...")
 model = YOLO("yolov8n.pt")
 
 print(f"   Model: YOLOv8n")
@@ -94,7 +94,7 @@ print(f"   Device: cuda")
 print(f"   Parameters: 3.2M")
 
 # Fine-tune
-print("\n2️⃣ Fine-tuning for 50 epochs...")
+print("\n2⃣ Fine-tuning for 50 epochs...")
 print(f"   Batch size: 16")
 print(f"   Learning rate: 0.001")
 print(f"   Patience (early stopping): 15")
@@ -115,26 +115,26 @@ results = model.train(
     plots=True,  # Generate training plots
 )
 
-print("\n✅ Training complete!")
+print("\n Training complete!")
 
 # =====================================================================
 # CELL 4: Evaluate Results
 # =====================================================================
 
-print("\n📈 Training Results")
+print("\n Training Results")
 print("=" * 70)
 
 checkpoint_path = output_dir / "yolov8n_finetuned/weights/best.pt"
 if checkpoint_path.exists():
-    print(f"\n✅ Checkpoint saved: {checkpoint_path}")
+    print(f"\n Checkpoint saved: {checkpoint_path}")
     print(f"   Size: {checkpoint_path.stat().st_size / 1e6:.1f} MB")
 else:
-    print(f"❌ Checkpoint not found at {checkpoint_path}")
+    print(f" Checkpoint not found at {checkpoint_path}")
 
 # List output files
 results_dir = output_dir / "yolov8n_finetuned"
 if results_dir.exists():
-    print(f"\n📂 Output files in {results_dir}:")
+    print(f"\n Output files in {results_dir}:")
     for f in results_dir.iterdir():
         if f.is_file():
             print(f"   - {f.name} ({f.stat().st_size / 1e6:.1f} MB)" if f.stat().st_size > 1e6 else f"   - {f.name}")
@@ -143,7 +143,7 @@ if results_dir.exists():
 # CELL 5: Generate Summary Report
 # =====================================================================
 
-print("\n📋 Summary Report")
+print("\n Summary Report")
 print("=" * 70)
 
 import json
@@ -179,14 +179,14 @@ summary_path = output_dir / "training_summary.json"
 with open(summary_path, 'w') as f:
     json.dump(summary, f, indent=2)
 
-print(f"\n✅ Summary saved: {summary_path}")
+print(f"\n Summary saved: {summary_path}")
 print(json.dumps(summary, indent=2))
 
 # =====================================================================
 # CELL 6: Download Instructions
 # =====================================================================
 
-print("\n📥 Download Instructions")
+print("\n Download Instructions")
 print("=" * 70)
 print("""
 All output files are in: /kaggle/working/models/yolov8n_finetuned/
@@ -204,5 +204,5 @@ Then proceed to Phase 3: OCR + ASR extraction
 """)
 
 print("\n" + "=" * 70)
-print("✅ Kaggle Training Complete!")
+print(" Kaggle Training Complete!")
 print("=" * 70)

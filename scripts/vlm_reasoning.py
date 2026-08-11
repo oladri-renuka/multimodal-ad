@@ -29,7 +29,7 @@ class VLMReasoningEngine:
         logger.info("PHASE 4: VLM REASONING LAYER (LLaVA-1.5 7B)")
         logger.info("=" * 70)
 
-        logger.info("\n1️⃣ Loading LLaVA-1.5 7B model...")
+        logger.info("\n1⃣ Loading LLaVA-1.5 7B model...")
         logger.info("   Model: LLaVA-1.5-7B-hf")
         logger.info("   Quantization: 4-bit (bitsandbytes)")
         logger.info("   GPU Memory: ~4GB")
@@ -57,17 +57,17 @@ class VLMReasoningEngine:
             )
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
 
-            logger.info("   ✓ Model loaded successfully")
-            logger.info(f"   ✓ Quantization: 4-bit NF4")
-            logger.info(f"   ✓ Device: {self.model.device}")
+            logger.info("    Model loaded successfully")
+            logger.info(f"    Quantization: 4-bit NF4")
+            logger.info(f"    Device: {self.model.device}")
 
         except Exception as e:
-            logger.error(f"   ✗ Failed to load LLaVA: {e}")
-            logger.info("\n   💡 Fallback: Using rule-based reasoning")
+            logger.error(f"    Failed to load LLaVA: {e}")
+            logger.info("\n    Fallback: Using rule-based reasoning")
             self.model = None
             self.tokenizer = None
 
-        logger.info("\n✅ VLM Engine ready!\n")
+        logger.info("\n VLM Engine ready!\n")
 
     def generate_reasoning_prompt(self, detection: Dict, ocr_text: Optional[str] = None) -> str:
         """Generate structured prompt for VLM"""
@@ -131,7 +131,7 @@ Return ONLY valid JSON (no markdown, no extra text):
 
     def reason_about_detection(self, detection: Dict, ocr_text: Optional[str] = None) -> Dict:
         """Generate reasoning verdict for detection"""
-        logger.info(f"🧠 Generating reasoning for {detection.get('class_name', 'unknown')}...")
+        logger.info(f" Generating reasoning for {detection.get('class_name', 'unknown')}...")
 
         # If model not available, use rule-based
         if not self.model:
@@ -161,24 +161,24 @@ Return ONLY valid JSON (no markdown, no extra text):
                 json_end = response.rfind('}') + 1
                 json_str = response[json_start:json_end]
                 verdict = json.loads(json_str)
-                logger.info(f"   ✓ Verdict: {verdict['violation_type']}")
+                logger.info(f"    Verdict: {verdict['violation_type']}")
                 return verdict
             except:
-                logger.warning("   ⚠ Could not parse JSON response")
+                logger.warning("    Could not parse JSON response")
                 return self.rule_based_reasoning(detection, ocr_text)
 
         except Exception as e:
-            logger.warning(f"   ⚠ LLaVA reasoning failed: {e}")
+            logger.warning(f"    LLaVA reasoning failed: {e}")
             return self.rule_based_reasoning(detection, ocr_text)
 
     def analyze_phase3_results(self, phase3_file: Path) -> List[Dict]:
         """Process Phase 3 results and add reasoning"""
-        logger.info(f"\n📂 Loading Phase 3 results: {phase3_file.name}")
+        logger.info(f"\n Loading Phase 3 results: {phase3_file.name}")
 
         with open(phase3_file, 'r') as f:
             phase3_results = json.load(f)
 
-        logger.info(f"✓ Loaded {len(phase3_results)} images\n")
+        logger.info(f" Loaded {len(phase3_results)} images\n")
 
         reasoning_results = []
 
@@ -232,7 +232,7 @@ def main():
     phase3_file = Path("results/phase3_analysis/phase3_results.json")
 
     if not phase3_file.exists():
-        logger.error(f"❌ Phase 3 results not found: {phase3_file}")
+        logger.error(f" Phase 3 results not found: {phase3_file}")
         logger.info("   Run Phase 3 first: python scripts/phase3_ocr_asr_pipeline.py")
         return
 
@@ -254,19 +254,19 @@ def main():
     logger.info(f"\n{'=' * 70}")
     logger.info("PHASE 4 COMPLETE")
     logger.info(f"{'=' * 70}")
-    logger.info(f"✅ Analyzed {len(reasoning_results)} images")
-    logger.info(f"✅ Verdicts saved: {output_file}\n")
+    logger.info(f" Analyzed {len(reasoning_results)} images")
+    logger.info(f" Verdicts saved: {output_file}\n")
 
     # Summary statistics
     total_violations = sum(len(r['detections']) for r in reasoning_results)
     flagged = sum(1 for r in reasoning_results for v in r['reasoning'] if v['recommended_action'] == 'flag')
 
-    logger.info("📊 STATISTICS:")
+    logger.info(" STATISTICS:")
     logger.info(f"   Total violations detected: {total_violations}")
     logger.info(f"   Violations flagged: {flagged}")
     logger.info(f"   Average confidence: {sum(v['confidence'] for r in reasoning_results for v in r['reasoning']) / max(1, sum(len(r['reasoning']) for r in reasoning_results)):.1%}")
 
-    logger.info(f"\n🚀 Next: Phase 5 - Metrics Pipeline & Ablation Studies")
+    logger.info(f"\n Next: Phase 5 - Metrics Pipeline & Ablation Studies")
 
 
 if __name__ == "__main__":

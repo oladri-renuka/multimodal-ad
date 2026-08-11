@@ -47,7 +47,7 @@ class MetricsEvaluator:
 
     def compute_metrics_detector_only(self, results: List[Dict]) -> Dict:
         """Evaluate detector-only baseline (Phase 2)"""
-        logger.info("\n1️⃣ DETECTOR-ONLY BASELINE (YOLOv8n)")
+        logger.info("\n1⃣ DETECTOR-ONLY BASELINE (YOLOv8n)")
         logger.info("-" * 70)
 
         total_violations = 0
@@ -100,7 +100,7 @@ class MetricsEvaluator:
 
     def compute_metrics_detector_plus_ocr(self, results: List[Dict]) -> Dict:
         """Evaluate detector + OCR (Phase 3)"""
-        logger.info("\n2️⃣ DETECTOR + OCR")
+        logger.info("\n2⃣ DETECTOR + OCR")
         logger.info("-" * 70)
 
         total_violations = 0
@@ -153,7 +153,7 @@ class MetricsEvaluator:
 
     def compute_metrics_full_pipeline(self, results: List[Dict]) -> Dict:
         """Evaluate full pipeline (Phase 4)"""
-        logger.info("\n3️⃣ FULL PIPELINE (Detection + OCR + Reasoning)")
+        logger.info("\n3⃣ FULL PIPELINE (Detection + OCR + Reasoning)")
         logger.info("-" * 70)
 
         total_violations = 0
@@ -283,7 +283,7 @@ class MetricsEvaluator:
 PHASE 5: METRICS & ABLATION COMPLETE
 {'=' * 70}
 
-📊 PERFORMANCE COMPARISON:
+ PERFORMANCE COMPARISON:
 
 | Configuration | Precision | Recall | F1 Score | Improvement |
 |---------------|-----------|--------|----------|-------------|
@@ -292,22 +292,22 @@ PHASE 5: METRICS & ABLATION COMPLETE
 | + OCR Integration | 82% | 78% | 0.80 | +47% |
 | + Reasoning Layer | 85% | 80% | 0.83 | +54% |
 
-⚡ EFFICIENCY:
+ EFFICIENCY:
 - Detector-only: 35ms latency, 1200MB memory
 - + OCR: 65ms latency, 1500MB memory
 - + Reasoning: 85ms latency, 1800MB memory
 
-🎯 ABLATION INSIGHTS:
+ ABLATION INSIGHTS:
 - Fine-tuning: +42% F1 improvement (most critical)
 - OCR integration: +5% additional F1 improvement
 - Reasoning layer: +3% additional F1 improvement (adds explainability)
 
-✅ COMPONENT IMPACT:
+ COMPONENT IMPACT:
 1. YOLOv8n fine-tuning: CRITICAL (core detection)
 2. OCR integration: IMPORTANT (context awareness)
 3. Reasoning layer: VALUABLE (explainability + moderation support)
 
-📈 PRODUCTION RECOMMENDATION:
+ PRODUCTION RECOMMENDATION:
 Deploy full pipeline for maximum accuracy (F1: 0.83)
 Light deployment: Detector-only for speed (F1: 0.77)
 
@@ -322,12 +322,12 @@ def main():
     evaluator = MetricsEvaluator()
 
     # Load results from each phase
-    logger.info("\n📂 Loading Phase Results...")
+    logger.info("\n Loading Phase Results...")
     phase3_results = evaluator.load_phase_results(3)
     phase4_results = evaluator.load_phase_results(4)
 
     if not phase3_results or not phase4_results:
-        logger.error("❌ Missing phase results")
+        logger.error(" Missing phase results")
         return
 
     # Compute metrics for each configuration
@@ -367,8 +367,8 @@ def main():
     with open(summary_file, 'w') as f:
         f.write(summary)
 
-    logger.info(f"✅ Results saved to {output_dir}/")
-    logger.info(f"\n🚀 Next: Phase 6 - FastAPI Backend & Docker Deployment")
+    logger.info(f" Results saved to {output_dir}/")
+    logger.info(f"\n Next: Phase 6 - FastAPI Backend & Docker Deployment")
 
 
 if __name__ == "__main__":

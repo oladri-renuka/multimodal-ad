@@ -31,40 +31,40 @@ class ViolationAnalyzer:
         checkpoint_path = Path(checkpoint_path)
 
         # Load detector
-        logger.info("\n1️⃣ Loading YOLOv8n checkpoint...")
+        logger.info("\n1⃣ Loading YOLOv8n checkpoint...")
         try:
             from ultralytics import YOLO
             self.detector = YOLO(str(checkpoint_path))
-            logger.info(f"   ✓ Loaded: {checkpoint_path.name}")
+            logger.info(f"    Loaded: {checkpoint_path.name}")
         except Exception as e:
-            logger.error(f"   ✗ Failed to load detector: {e}")
+            logger.error(f"    Failed to load detector: {e}")
             raise
 
         # Load OCR
-        logger.info("\n2️⃣ Loading EasyOCR...")
+        logger.info("\n2⃣ Loading EasyOCR...")
         try:
             import easyocr
             self.ocr_reader = easyocr.Reader(['en'])
-            logger.info("   ✓ EasyOCR ready (English)")
+            logger.info("    EasyOCR ready (English)")
         except Exception as e:
-            logger.error(f"   ✗ Failed to load OCR: {e}")
+            logger.error(f"    Failed to load OCR: {e}")
             self.ocr_reader = None
 
         # Load ASR
-        logger.info("\n3️⃣ Loading Whisper ASR...")
+        logger.info("\n3⃣ Loading Whisper ASR...")
         try:
             import whisper
             self.asr_model = whisper.load_model("base")
-            logger.info("   ✓ Whisper 'base' loaded")
+            logger.info("    Whisper 'base' loaded")
         except Exception as e:
-            logger.error(f"   ✗ Failed to load ASR: {e}")
+            logger.error(f"    Failed to load ASR: {e}")
             self.asr_model = None
 
-        logger.info("\n✅ All models loaded successfully!\n")
+        logger.info("\n All models loaded successfully!\n")
 
     def detect_violations(self, image_path: Path) -> List[Dict]:
         """Detect weapons/products in image"""
-        logger.info(f"🎯 Running YOLOv8n detection on {image_path.name}...")
+        logger.info(f" Running YOLOv8n detection on {image_path.name}...")
 
         try:
             results = self.detector.predict(str(image_path), conf=0.45, verbose=False)
@@ -80,20 +80,20 @@ class ViolationAnalyzer:
                     }
                     detections.append(detection)
 
-            logger.info(f"   ✓ Found {len(detections)} violations")
+            logger.info(f"    Found {len(detections)} violations")
             return detections
 
         except Exception as e:
-            logger.error(f"   ✗ Detection failed: {e}")
+            logger.error(f"    Detection failed: {e}")
             return []
 
     def extract_text(self, image_path: Path) -> List[Dict]:
         """Extract text from image using OCR"""
         if not self.ocr_reader:
-            logger.warning("   ⚠ OCR not available")
+            logger.warning("    OCR not available")
             return []
 
-        logger.info(f"🔤 Extracting text from {image_path.name}...")
+        logger.info(f" Extracting text from {image_path.name}...")
 
         try:
             results = self.ocr_reader.readtext(str(image_path))
@@ -107,25 +107,25 @@ class ViolationAnalyzer:
                     "bbox": [[float(x), float(y)] for x, y in bbox]
                 })
 
-            logger.info(f"   ✓ Extracted {len(text_data)} text regions")
+            logger.info(f"    Extracted {len(text_data)} text regions")
             return text_data
 
         except Exception as e:
-            logger.error(f"   ✗ OCR failed: {e}")
+            logger.error(f"    OCR failed: {e}")
             return []
 
     def transcribe_audio(self, audio_path: Path) -> Optional[Dict]:
         """Extract speech from audio using Whisper"""
         if not self.asr_model:
-            logger.warning("   ⚠ ASR not available")
+            logger.warning("    ASR not available")
             return None
 
         audio_path = Path(audio_path)
         if not audio_path.exists():
-            logger.warning(f"   ⚠ Audio file not found: {audio_path}")
+            logger.warning(f"    Audio file not found: {audio_path}")
             return None
 
-        logger.info(f"🔊 Transcribing {audio_path.name}...")
+        logger.info(f" Transcribing {audio_path.name}...")
 
         try:
             result = self.asr_model.transcribe(str(audio_path), verbose=False)
@@ -144,11 +144,11 @@ class ViolationAnalyzer:
                         "text": seg['text']
                     })
 
-            logger.info(f"   ✓ Transcribed: {result['text'][:80]}...")
+            logger.info(f"    Transcribed: {result['text'][:80]}...")
             return transcript
 
         except Exception as e:
-            logger.error(f"   ✗ ASR failed: {e}")
+            logger.error(f"    ASR failed: {e}")
             return None
 
     def analyze(self, image_path: Path, audio_path: Optional[Path] = None) -> Dict:
@@ -185,7 +185,7 @@ def main():
     # Initialize analyzer
     checkpoint = Path("models/best.pt")
     if not checkpoint.exists():
-        logger.error(f"❌ Checkpoint not found: {checkpoint}")
+        logger.error(f" Checkpoint not found: {checkpoint}")
         return
 
     analyzer = ViolationAnalyzer(checkpoint)
@@ -204,11 +204,11 @@ def main():
             test_images.extend(list(test_dir.glob("*.png")))
 
     if not test_images:
-        logger.warning("⚠ No test images found")
+        logger.warning(" No test images found")
         logger.info("Create test images in data/test_clips/ or use data/raw/")
         return
 
-    logger.info(f"\n✅ Found {len(test_images)} test images\n")
+    logger.info(f"\n Found {len(test_images)} test images\n")
 
     # Create output directory
     output_dir = Path("results/phase3_analysis")
@@ -232,20 +232,20 @@ def main():
     logger.info(f"\n{'=' * 70}")
     logger.info("PHASE 3 COMPLETE")
     logger.info(f"{'=' * 70}")
-    logger.info(f"✅ Analyzed {len(results)} images")
-    logger.info(f"✅ Results saved: {output_file}\n")
+    logger.info(f" Analyzed {len(results)} images")
+    logger.info(f" Results saved: {output_file}\n")
 
     # Summary statistics
     total_detections = sum(len(r['detections']) for r in results)
     total_text = sum(len(r['ocr']) for r in results)
 
-    logger.info("📊 STATISTICS:")
+    logger.info(" STATISTICS:")
     logger.info(f"   Total detections: {total_detections}")
     logger.info(f"   Total text regions: {total_text}")
     logger.info(f"   Average detections/image: {total_detections/len(results):.1f}")
     logger.info(f"   Average text regions/image: {total_text/len(results):.1f}")
 
-    logger.info(f"\n🚀 Next: Phase 4 - VLM Reasoning Layer (LLaVA)")
+    logger.info(f"\n Next: Phase 4 - VLM Reasoning Layer (LLaVA)")
 
 
 if __name__ == "__main__":
