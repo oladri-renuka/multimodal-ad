@@ -1,102 +1,101 @@
 # Multimodal Content Safety Reviewer
 
-**Status:** ✅ Production Ready
+A content safety system for detecting policy violations (weapons, NSFW, counterfeit content) across visual, textual, and audio modalities in video/image uploads.
 
-A production-grade content safety system for detecting policy violations (weapons, NSFW, counterfeit content) across visual, textual, and audio modalities in video/image uploads.
-
-## Overview
-
-This system combines fine-tuned object detection (YOLOv8n), optical character recognition (EasyOCR), automatic speech recognition (Whisper), and rule-based reasoning to provide explainable content moderation verdicts.
-
-**Key Features:**
-- ✅ Fine-tuned YOLOv8n detector: mAP50 0.78 (+140% over baseline)
-- ✅ Real-time frame extraction and batch processing
-- ✅ OCR text extraction with confidence scores
-- ✅ ASR audio transcription and alignment
-- ✅ Rule-based violation reasoning with context awareness
-- ✅ Async FastAPI backend with result polling
-- ✅ Docker containerization for cloud deployment
-
-## Quick Start
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Start API server
-export LIBGL_ALWAYS_INDIRECT=1
-python3 -m src.api.app
-
-# Open web UI
-# → http://localhost:8000
-```
-
-Test with sample images — detector identifies weapons with 65-81% confidence in real test data.
-
-## Architecture
+## System Architecture
 
 ```
 Input (Image/Video)
         ↓
-[Frame Extraction] → Extract frames at target FPS
+[Frame Extraction] → Extract frames at target FPS (configurable)
         ↓
 ┌─────────────────────────────────────────┐
-│ Parallel Analysis Per Frame:            │
-│ • YOLOv8n Detection (weapons/NSFW)      │
+│ Per-Frame Parallel Analysis:            │
+│ • YOLOv8n Detection (fine-tuned)        │
 │ • EasyOCR Text Extraction               │
 │ • Whisper ASR (audio track)             │
 └─────────────────────────────────────────┘
         ↓
-[Rule-Based Reasoning] → Context-aware verdicts
+[Rule-Based Reasoning] → Violation classification
         ↓
-[JSON Report] → Structured violations + bboxes
+[JSON Report] → Structured output with bboxes
 ```
 
-## Installation
+## Components
 
-### Requirements
-- Python 3.9+
-- PyTorch 2.0+ (CPU or CUDA)
-- FFmpeg (for video processing)
-- System libraries: libgl1, libxcb1, libXext, libXrender
+### 1. Object Detection (YOLOv8n)
 
-### Setup
+Fine-tuned on real violation dataset (6,000+ images).
 
-```bash
-# Clone repository
-git clone <repo-url>
-cd multimodal-ad
+**Performance on Test Set:**
 
-# Install dependencies
-pip install -r requirements.txt
+| Metric | Baseline | Fine-tuned | Δ |
+|--------|----------|-----------|---|
+| mAP50 | 0.32 | 0.78 | +144% |
+| Precision | 0.62 | 0.80 | +29% |
+| Recall | 0.48 | 0.75 | +56% |
+| F1 | 0.54 | 0.77 | +43% |
 
-# Set environment variables
-cp .env.example .env
-export LIBGL_ALWAYS_INDIRECT=1  # For headless graphics
+**Real-World Results:**
+
+- Training batch (annotated, 7 weapons): 6/7 detected (57-81% confidence)
+- Real weapon images: 1-3 detections per image (54-71% confidence)
+
+**Model Details:**
+- Architecture: YOLOv8n (3.2M parameters)
+- Input: 640x640 RGB
+- Output: Bounding boxes + class + confidence
+- Inference: ~30ms per frame (CPU), ~5ms (GPU)
+- Classes: weapon, nsfw, counterfeit
+
+### 2. Optical Character Recognition (EasyOCR)
+
+Extracts text regions and confidence scores from frames.
+
+- Language: English (configurable)
+- Output: Text + bounding boxes + confidence per region
+- Used for context filtering (e.g., weapon in training video labeled "Combat Training")
+
+### 3. Automatic Speech Recognition (Whisper)
+
+Extracts and transcribes audio from video.
+
+- Model: whisper-base (~140MB)
+- Languages: Multilingual (automatic detection)
+- Alignment: Maps transcript segments to frame indices
+- Optional: Can skip for silent/image-only inputs
+
+### 4. Rule-Based Reasoning
+
+Combines detector + OCR + ASR outputs into structured verdicts.
+
+```python
+if class_name == "weapon":
+    action = "review"  # Requires human verification
+    reasoning = f"Weapon detected with {confidence:.1%} confidence. Requires context review."
+    
+elif class_name == "nsfw":
+    action = "flag" if confidence > 0.7 else "review"
+    
+else:  # counterfeit
+    action = "review"
 ```
 
-### Docker
+Verdicts: `["flag", "review", "allow"]`
 
-```bash
-# Build image
-docker build -f docker/Dockerfile -t multimodal-ad:latest .
+## API
 
-# Run container
-docker run -p 8000:8000 \
-  -e LIBGL_ALWAYS_INDIRECT=1 \
-  multimodal-ad:latest
-```
+### POST /analyze
 
-## Usage
+Submit file for analysis.
 
-### API Endpoints
-
-**POST /analyze** — Submit file for analysis
 ```bash
 curl -X POST http://localhost:8000/analyze \
   -F "file=@image.jpg"
+```
 
-# Returns:
+Response:
+```json
 {
   "job_id": "abc123",
   "status": "processing",
@@ -104,15 +103,20 @@ curl -X POST http://localhost:8000/analyze \
 }
 ```
 
-**GET /results/{job_id}** — Poll for results
+### GET /results/{job_id}
+
+Poll for results (completed results cached for 1 hour).
+
 ```bash
 curl http://localhost:8000/results/abc123
+```
 
-# Returns (on completion):
+Response (on completion):
+```json
 {
   "job_id": "abc123",
   "status": "completed",
-  "violations_detected": 1,
+  "violations_detected": 2,
   "frames": [
     {
       "frame_idx": 0,
@@ -123,12 +127,20 @@ curl http://localhost:8000/results/abc123
           "bbox_xyxy": [x1, y1, x2, y2]
         }
       ],
+      "ocr": [
+        {
+          "text": "Combat Training",
+          "confidence": 0.95,
+          "bbox": [[x, y], ...]
+        }
+      ],
       "reasoning": [
         {
           "violation_type": "weapon",
           "confidence": 0.89,
-          "reasoning": "Weapon detected with 89% confidence. Requires context review...",
-          "recommended_action": "review"
+          "reasoning": "Weapon detected with 89% confidence. Requires context review.",
+          "recommended_action": "review",
+          "evidence": ["weapon", "confidence:0.89"]
         }
       ]
     }
@@ -136,240 +148,206 @@ curl http://localhost:8000/results/abc123
 }
 ```
 
-**GET /health** — System health check
+### GET /health
+
+System status and model state.
+
 ```bash
 curl http://localhost:8000/health
 ```
 
-### Web Demo
+Response:
+```json
+{
+  "status": "healthy",
+  "models_loaded": {
+    "detector": "fine-tuned",
+    "ocr": "ready",
+    "asr": "ready"
+  },
+  "gpu_available": false,
+  "memory_usage_mb": 1487.45
+}
+```
 
-Open browser to `http://localhost:8000` for interactive demo with:
-- Drag-drop file upload
-- Real-time analysis
-- Visual results with bounding boxes
-- Detailed violation breakdowns
+## Installation
 
-## Model Performance
+### Requirements
 
-### Quantitative Metrics
+- Python 3.9+
+- PyTorch 2.0+ (CPU or CUDA)
+- OpenCV 5.0+
+- FFmpeg (for video processing)
 
-| Metric | Pretrained | Fine-tuned | Improvement |
-|--------|-----------|-----------|------------|
-| mAP50 | 0.32 | 0.78 | +144% |
-| Precision | 0.62 | 0.80 | +29% |
-| Recall | 0.48 | 0.75 | +56% |
-| F1-Score | 0.54 | 0.77 | +43% |
-| False Positive Rate | 0.12 | 0.08 | -33% |
-| Inference Latency | ~35ms | ~30ms | -14% |
+### System Dependencies (Linux/EC2)
 
-### Real-World Test Results
+```bash
+sudo yum install libglvnd-glx libxcb libXext libXrender -y
+# or on Ubuntu:
+sudo apt-get install libgl1 libsm6 libxext6 libxrender-dev -y
+```
 
-Tested on actual weapon images:
+### Python Setup
 
-| Test Image | Detections | Confidence Range |
-|-----------|-----------|------------------|
-| Training batch (7 weapons) | 6/7 | 57-81% |
-| Real weapon photo #1 | 1 | 71% |
-| Real weapon photo #2 | 3 | 54-65% |
-| Real weapon photo #3 | 2 | 61-69% |
+```bash
+git clone https://github.com/oladri-renuka/multimodal-ad.git
+cd multimodal-ad
 
-**Dataset:** 6,000+ real images from OpenImages V7 across 3 violation classes
+pip install -r requirements.txt
 
-## Configuration
+# GPU (optional)
+pip install torch==2.0.0 torchvision==0.15 --index-url https://download.pytorch.org/whl/cu118
 
-Edit `configs/` for model parameters:
+# CPU (default)
+pip install torch==2.0.0 torchvision==0.15 --index-url https://download.pytorch.org/whl/cpu
+```
 
-- `detector_config.yaml` — YOLOv8 hyperparameters, thresholds
-- `pipeline_config.yaml` — FPS, batch sizes, timeouts
+## Usage
 
-Key settings:
+### Local Server
+
+```bash
+export LIBGL_ALWAYS_INDIRECT=1  # Required on headless systems
+python3 -m src.api.app
+```
+
+Server starts on `http://localhost:8000`
+
+Open `http://localhost:8000` in browser for web UI.
+
+### Configuration
+
+Edit `configs/pipeline_config.yaml`:
+
 ```yaml
 detector:
   confidence_threshold: 0.45
   iou_threshold: 0.5
-  device: "cuda"  # or "cpu"
+  device: "cpu"  # "cuda" if GPU available
 
 pipeline:
-  target_fps: 2
+  target_fps: 2  # Extract frames at 2 FPS for 30s video = 60 frames
   max_frames: 500
-  inference_timeout: 120
+  inference_timeout_sec: 120
 ```
 
-## Deployment
+### Programmatic Usage
 
-### AWS EC2
+```python
+from src.api.inference import InferenceOrchestrator
+from pathlib import Path
 
-```bash
-# On t3.medium instance (2GB RAM minimum)
-ssh -i key.pem ec2-user@<ip>
+orch = InferenceOrchestrator()
 
-# Setup
-git clone <repo>
-cd multimodal-ad
-pip install -r requirements.txt
-export LIBGL_ALWAYS_INDIRECT=1
+result = orch.analyze_image(
+    Path("test_image.jpg"),
+    detector_threshold=0.45,
+    ocr_enabled=True,
+    reasoning_enabled=True
+)
 
-# Run
-python3 -m src.api.app
+print(result["violations_detected"])
+print(result["frames"][0]["detections"])
 ```
-
-Access: `http://<public-ip>:8000`
-
-### Railway / Cloud Platform
-
-Environment variables:
-```
-LIBGL_ALWAYS_INDIRECT=1
-LOG_LEVEL=INFO
-API_PORT=8000
-```
-
-Ensure volume ≥ 20GB and instance has ≥ 2GB RAM.
 
 ## Project Structure
 
 ```
-multimodal-ad/
-├── src/
-│   ├── api/
-│   │   ├── app.py              # FastAPI application
-│   │   ├── models.py           # Pydantic request/response models
-│   │   └── inference.py        # Orchestration + reasoning
-│   ├── core/
-│   │   ├── config.py           # Configuration system
-│   │   ├── frame_extractor.py  # Video frame extraction
-│   │   └── data_pipeline.py    # Dataset utilities
-│   ├── detectors/
-│   │   └── yolov8_inferencer.py # Detection wrapper
-│   ├── ocr/
-│   │   └── ocr_extractor.py    # EasyOCR wrapper
-│   └── asr/
-│       └── whisper_extractor.py # Whisper wrapper
-├── models/
-│   ├── best.pt                 # Fine-tuned YOLOv8n (5.9MB)
-│   └── easyocr/                # OCR model cache
-├── configs/
-│   ├── detector_config.yaml
-│   └── pipeline_config.yaml
-├── docker/
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── data/
-│   ├── raw/                    # Raw datasets
-│   ├── processed/              # Train/val/test splits
-│   └── test_clips/             # Demo test media
-├── tests/                      # Unit tests
-├── requirements.txt            # Dependencies
-├── CLAUDE.md                   # Developer conventions
-└── README.md                   # This file
+src/
+├── api/
+│   ├── app.py              # FastAPI server
+│   ├── models.py           # Pydantic models
+│   └── inference.py        # Orchestration + reasoning
+├── core/
+│   ├── config.py           # Configuration system
+│   ├── frame_extractor.py  # Video → frames + audio
+│   └── data_pipeline.py    # Dataset utilities
+├── detectors/
+│   └── yolov8_inferencer.py
+├── ocr/
+│   └── ocr_extractor.py
+└── asr/
+    └── whisper_extractor.py
+
+models/
+├── best.pt                 # Fine-tuned YOLOv8n (5.9MB)
+└── easyocr/                # OCR model cache
+
+configs/
+├── detector_config.yaml
+└── pipeline_config.yaml
+
+docker/
+├── Dockerfile
+└── docker-compose.yml
+
+tests/
+├── test_detectors.py
+├── test_ocr.py
+├── test_asr.py
+└── conftest.py
 ```
 
-## Development
+## Training
 
-### Running Tests
-
-```bash
-pytest tests/ -v
-pytest tests/test_detectors.py -v --cov=src/detectors
-```
-
-### Fine-tuning on Custom Data
+### Fine-tuning YOLOv8n
 
 ```python
 from src.detectors.yolov8_trainer import train_detector
+from src.core.config import DetectorConfig
 
 config = DetectorConfig(
-    dataset_path="data/custom_dataset/data.yaml",
+    dataset_path="data/yolo_dataset/data.yaml",
     epochs=50,
     batch_size=16,
     device="cuda"
 )
 
-best_model = train_detector(config)
+best_checkpoint = train_detector(config)
 ```
 
-Dataset must be in YOLO format:
+Dataset format (YOLO):
 ```
-data/
-├── images/
-│   ├── train/
-│   ├── val/
-│   └── test/
-├── labels/
-│   ├── train/
-│   ├── val/
-│   └── test/
+data/yolo_dataset/
+├── images/{train,val,test}/
+├── labels/{train,val,test}/
 └── data.yaml
 ```
 
-## Limitations & Known Issues
+## Testing
 
-1. **GPU Memory:** Full model stack requires ≥ 4GB VRAM. CPU inference is slow (~5s/frame).
-2. **Context Sensitivity:** Weapons in legitimate contexts (military, training videos) may flag false positives. Designed for human-in-the-loop review, not autonomous enforcement.
-3. **Audio Processing:** Whisper requires separate audio track; silent videos skip ASR.
-4. **Latency:** Async processing: image ~1s, 30s video ~60-120s depending on FPS extraction.
-
-## System Requirements
-
-### Tested & Verified ✅
-
-- **OS:** macOS (Sonnet 5), Amazon Linux 2, Ubuntu 20.04+
-- **Python:** 3.9+
-- **Memory:** 1.5-2GB RAM (CPU mode), 4GB+ (GPU mode)
-- **Storage:** 10GB+ for models + data
-- **GPU:** Optional (inference runs fine on CPU, ~30ms/frame)
-
-### Dependencies Pinned
-
-```
-torch==2.0.0+cpu
-torchvision==0.15
-ultralytics==8.4.117
-opencv-python==5.0.0.93
-numpy<2  # Critical: NumPy 2.0 breaks torch compatibility
-```
-
-## Troubleshooting
-
-**libGL.so.1 not found (Linux/EC2):**
 ```bash
-export LIBGL_ALWAYS_INDIRECT=1
-# Install system libraries:
-sudo yum install libglvnd-glx libxcb libXext libXrender -y
+# All tests
+pytest tests/ -v
+
+# Specific component
+pytest tests/test_detectors.py -v
+
+# With coverage
+pytest tests/ --cov=src --cov-report=html
 ```
 
-**NumPy version conflict:**
-```bash
-pip install 'numpy<2'  # Must be <2 for torch 2.0
-```
+## Known Issues
 
-**Out of memory on inference:**
-- Reduce `target_fps` in `configs/pipeline_config.yaml`
-- Use CPU-only torch (included by default)
-- Deploy to instance with ≥2GB RAM
+1. **Confidence Threshold Sensitivity:** Default 0.45 threshold may miss low-confidence violations. Adjust per use case.
 
-**Port 8000 in use:**
-```bash
-lsof -i :8000
-kill -9 <PID>
-```
+2. **Context Loss:** Detector flags weapons regardless of context (military training, historical footage, etc.). Verdicts set to "review" to require human verification.
 
-**Model not detecting:**
-- Verify `models/best.pt` exists and is 6.2MB
-- Run `python3 -m pytest tests/test_detectors.py -v`
-- Check confidence threshold (default 0.45)
+3. **Audio Processing:** Whisper inference is slow (~5-10s per 30s video). Can be disabled for image-only inputs.
+
+4. **Memory Usage:** Full model stack on CPU uses ~1.5GB RAM. GPU mode (CUDA) requires 4GB+ VRAM.
+
+5. **Video Frame Extraction:** Target FPS (default 2) dramatically affects analysis time. 30s video at 2 FPS = 60 frames ~30s processing.
 
 ## References
 
-- **YOLOv8**: https://docs.ultralytics.com/
-- **EasyOCR**: https://github.com/JaidedAI/EasyOCR
-- **Whisper**: https://github.com/openai/whisper
-- **FastAPI**: https://fastapi.tiangolo.com/
+- YOLOv8 Docs: https://docs.ultralytics.com/
+- EasyOCR: https://github.com/JaidedAI/EasyOCR
+- Whisper: https://github.com/openai/whisper
+- FastAPI: https://fastapi.tiangolo.com/
 
-## License
+## Dataset Attribution
 
-Proprietary. Dataset sourced from OpenImages V7 (CC-BY-2.0).
-
-## Contact
-
-For questions or deployment support, contact the team.
+- Weapons: OpenImages V7 (CC-BY-2.0)
+- NSFW: FAIR LAION Safety Dataset
+- Counterfeit: OpenImages Products category
